@@ -35,9 +35,11 @@ h1{ font:900 24px "Arial Black",Arial,sans-serif; margin:0 0 6px } h1 em{ font-s
 "use strict";
 /* "#18155550100|Hi Pat..." -> sms: link, or null if the link was cut off or edited. */
 function parseText(hash, ios){
-  var h = String(hash || "").replace(/^#/, ""), bar = h.indexOf("|");
+  /* Gmail re-encodes the "|" as %7C when it passes the link on, so accept both. */
+  var h = String(hash || "").replace(/^#/, ""), bar = h.indexOf("|"), skip = 1;
+  if (bar < 0){ bar = h.search(/%7C/i); skip = 3; }
   if (bar < 0) return null;
-  var to = decodeURIComponent(h.slice(0, bar)).replace(/\D/g, ""), body = decodeURIComponent(h.slice(bar + 1));
+  var to = decodeURIComponent(h.slice(0, bar)).replace(/\D/g, ""), body = decodeURIComponent(h.slice(bar + skip));
   if (to.length === 10) to = "1" + to;
   if (to.length !== 11 || !body) return null;
   /* iPhone wants sms:NUMBER&body=, Android wants sms:NUMBER?body= */
