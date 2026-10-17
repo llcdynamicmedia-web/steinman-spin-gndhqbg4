@@ -508,11 +508,12 @@ table.data tr:nth-child(even) td{background:#181818}
 
 <script>
 /* ============================================================
-   Minimal QR encoder — alphanumeric mode, EC level M, versions 1-6.
-   Voucher payloads are uppercase letters, digits, space, "-" and "/",
-   which are all inside the 45-character alphanumeric set, so this never
-   needs byte mode. Returns false if the payload will not fit, and the
-   voucher simply prints without a QR in that case.
+   Minimal QR encoder — EC level M, versions 1-6.
+   Alphanumeric mode for all-caps text (the plain voucher and the old text-message
+   payloads), byte mode for anything else -- added 2026-10-16 so the QR can hold a
+   normal web link (lower case, "#", "/"), which alphanumeric mode cannot.
+   All-caps payloads still come out bit-for-bit as before. Returns false if the
+   payload will not fit, and the voucher simply prints without a QR in that case.
    ============================================================ */
 var QR = (function(){
   var AN = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
@@ -555,14 +556,27 @@ var QR = (function(){
     for (var i=len-1;i>=0;i--) this.a.push((val >>> i) & 1);
   };
 
-  function encode(text, ver){
-    var cfg = V[ver], bits = new Bits();
-    bits.put(2, 4);                 // alphanumeric mode
-    bits.put(text.length, 9);       // count indicator, versions 1-9
-    var i;
-    for (i=0;i+1<text.length;i+=2)
-      bits.put(AN.indexOf(text[i])*45 + AN.indexOf(text[i+1]), 11);
-    if (i < text.length) bits.put(AN.indexOf(text[i]), 6);
+  /* UTF-8 bytes of a string (links are plain ASCII, but be correct anyway). */
+  function utf8(text){
+    var out = [], s = unescape(encodeURIComponent(text));
+    for (var i=0;i<s.length;i++) out.push(s.charCodeAt(i));
+    return out;
+  }
+
+  function encode(text, ver, byteMode){
+    var cfg = V[ver], bits = new Bits(), i;
+    if (byteMode){
+      var bytes = utf8(text);
+      bits.put(4, 4);               // byte mode
+      bits.put(bytes.length, 8);    // count indicator, versions 1-9
+      for (i=0;i<bytes.length;i++) bits.put(bytes[i], 8);
+    } else {
+      bits.put(2, 4);               // alphanumeric mode
+      bits.put(text.length, 9);     // count indicator, versions 1-9
+      for (i=0;i+1<text.length;i+=2)
+        bits.put(AN.indexOf(text[i])*45 + AN.indexOf(text[i+1]), 11);
+      if (i < text.length) bits.put(AN.indexOf(text[i]), 6);
+    }
 
     var cap = cfg.d * 8;
     if (bits.a.length > cap) return null;
@@ -689,10 +703,11 @@ var QR = (function(){
   }
 
   function matrix(text){
-    text = String(text).toUpperCase();
-    for (var i=0;i<text.length;i++) if (AN.indexOf(text[i]) < 0) return null;
+    text = String(text);
+    var byteMode = false;
+    for (var i=0;i<text.length;i++) if (AN.indexOf(text[i]) < 0) byteMode = true;
     var ver = 0, cw = null;
-    for (var v=1;v<=6;v++){ cw = encode(text, v); if (cw){ ver = v; break; } }
+    for (var v=1;v<=6;v++){ cw = encode(text, v, byteMode); if (cw){ ver = v; break; } }
     if (!ver) return null;
     var base = build(ver, cw), n = base.n, best = null, bestP = Infinity;
     for (var k=0;k<8;k++){
@@ -762,6 +777,12 @@ var CFG = {
      number. Put the 10 digits in quotes, e.g. "8155551234". Leave it "" and the QR
      just holds the voucher details as plain text, the way it always has. */
   textTo:     "8153144898",   // Adam's Google Voice, set up 2026-10-16
+  /* The customer's phone copy (Adam, 2026-10-16: "i want like a png file"). When set,
+     the voucher QR opens this page on the customer's phone; it draws the voucher as a
+     PNG they can save, and has a button to text it to textTo. Their phone needs data;
+     the kiosk does not. Leave "" to fall back to the text-message QR. Source is
+     voucher_page/v.html, published by publish_ipad.py. */
+  voucherPage:"https://llcdynamicmedia-web.github.io/steinman-spin-gndhqbg4/v",
   defaultPin: "2026",
   /* false = every spin uses the true printed odds (3/3/2/1/1 in 10). When a printed
              pile runs out the app keeps going with unlimited X-series codes and staff
@@ -1234,7 +1255,14 @@ function textToNumber(){
   if (d.length === 10) d = "1" + d;
   return d.length === 11 && d.charAt(0) === "1" ? d : "";
 }
+/* "#0091.200.1500" -- the code without "ST-2026-", then prize and minimum. Kept
+   short so the link fits a 37x37 QR, the same size as the text-message one. */
+function voucherLink(rec){
+  var code = rec.voucher.indexOf(CFG.codePrefix) === 0 ? rec.voucher.slice(CFG.codePrefix.length) : rec.voucher;
+  return CFG.voucherPage + "#" + code + "." + rec.prize + "." + rec.minSpend;
+}
 function voucherQrPayload(rec){
+  if (CFG.voucherPage) return voucherLink(rec);
   var p = CFG.deadline.split("-"), exp = p[1] + "/" + p[2] + "/" + p[0];
   var to = textToNumber();
   if (!to) return rec.voucher + " " + rec.prize + " OFF MIN " + rec.minSpend + " EXP " + exp;
@@ -1243,13 +1271,14 @@ function voucherQrPayload(rec){
 }
 
 function drawVoucherQR(rec){
-  var cv = $("vQr"), texting = !!textToNumber();
-  /* The text-message QR is denser (37 squares across). 180px is exactly 4px a square
-     with the quiet border, so it stays sharp and scans from arm's length. */
+  var cv = $("vQr"), linking = !!CFG.voucherPage, texting = linking || !!textToNumber();
+  /* The link and text-message QRs are denser (37 squares across). 180px is exactly
+     4px a square with the quiet border, so it stays sharp and scans from arm's length. */
   var ok = false;
   try { ok = QR.render(cv, voucherQrPayload(rec), texting ? 180 : 150); } catch(e){ ok = false; }
   $("vQrWrap").classList.toggle("hide", !ok);
-  $("vQrCap").innerHTML = texting ? "SCAN WITH YOUR PHONE<br>HIT SEND TO KEEP IT" : "SCAN AT THE COUNTER";
+  $("vQrCap").innerHTML = linking ? "SCAN TO SAVE IT<br>TO YOUR PHONE"
+                        : (texting ? "SCAN WITH YOUR PHONE<br>HIT SEND TO KEEP IT" : "SCAN AT THE COUNTER");
   $("vQrCap").classList.toggle("texting", texting);
 }
 

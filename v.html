@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#111111">
+<title>Steinman Voucher</title>
+<!--
+  The customer's copy of their voucher. The kiosk QR opens this page on the
+  customer's phone as  .../v#0091.200.1500  (code without "ST-2026-", prize,
+  minimum). The page draws the voucher as a PNG they can save to Photos, and
+  offers a button to text it to the shop's Google Voice number.
+
+  Hand-edited, no build step. Published next to the kiosk by publish_ipad.py,
+  with the two logo files from assets/ beside it. Nothing about the customer is
+  in the link or sent anywhere.
+-->
+<style>
+:root{ --black:#111111; --yellow:#FFD52A; --white:#FFFFFF; --charcoal:#242424; }
+*{ box-sizing:border-box }
+body{ margin:0; background:var(--black); color:var(--white);
+      font-family:-apple-system,"Helvetica Neue",Arial,sans-serif; -webkit-text-size-adjust:100% }
+.wrap{ max-width:540px; margin:0 auto; padding:18px 16px 40px }
+h1{ font-family:"Arial Black",Arial,sans-serif; font-weight:900; font-size:26px; margin:6px 0 4px; letter-spacing:-.5px }
+h1 em{ font-style:normal; color:var(--yellow) }
+.lead{ color:#BBBBBB; font-size:15px; margin:0 0 14px; line-height:1.4 }
+#vimg{ display:block; width:100%; height:auto; border-radius:14px; border:2px solid var(--yellow);
+       -webkit-touch-callout:default }
+.btn{ display:block; width:100%; margin:12px 0 0; padding:17px 12px; border:0; border-radius:10px;
+      font:900 18px "Arial Black",Arial,sans-serif; letter-spacing:.5px; text-align:center; text-decoration:none; cursor:pointer }
+.btn.save{ background:var(--yellow); color:var(--black) }
+.btn.text{ background:var(--white); color:var(--black) }
+.btn.call{ background:var(--charcoal); color:var(--yellow); border:2px solid var(--yellow) }
+.hint{ color:#999999; font-size:13px; text-align:center; margin:10px 0 0; line-height:1.45 }
+.err{ background:var(--charcoal); border-left:5px solid var(--yellow); padding:16px; border-radius:8px; line-height:1.5 }
+.hide{ display:none }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>YOUR <em>VOUCHER</em></h1>
+  <p class="lead" id="lead">Save it to your phone so you have it when you book.</p>
+  <div id="ok" class="hide">
+    <img id="vimg" alt="Your Steinman voucher">
+    <button class="btn save" id="saveBtn">SAVE TO MY PHONE</button>
+    <p class="hint">Or press and hold the voucher, then tap <b>Save to Photos</b>.</p>
+    <a class="btn text" id="textBtn">TEXT IT TO STEINMAN</a>
+    <p class="hint">Sends us your code so we can hold it for you.</p>
+    <a class="btn call" id="callBtn">CALL TO BOOK</a>
+  </div>
+  <div id="bad" class="err hide"></div>
+</div>
+
+<script>
+"use strict";
+/* ---------- settings — tests/test_vouchers.js checks these match the kiosk ----------
+   (src/03_app.js CFG, SEGMENTS and VOUCHER_BLOCKS). Change the kiosk, then this. */
+var VCFG = {
+  codePrefix:  "ST-2026-",
+  deadlineTxt: "November 24, 2026",
+  phone:       "815-378-3296",
+  email:       "service@steinmanauto.com",
+  textTo:      "8153144898",
+  prizes:      { 25:100, 50:300, 75:500, 100:750, 200:1500 },
+  blocks:      { 25:[1,30], 50:[31,60], 75:[61,80], 100:[81,90], 200:[91,100] }
+};
+
+/* "#0091.200.1500" -> {code:"ST-2026-0091", prize:200, min:1500}, or null if the
+   link was cut off or edited (wrong minimum, printed code from another prize's block). */
+function parseVoucher(hash){
+  var m = /^#?((?:X|XM|XI)?)(\d{4})\.(\d+)\.(\d+)$/.exec(String(hash || ""));
+  if (!m) return null;
+  var prize = parseInt(m[3], 10), min = parseInt(m[4], 10), num = parseInt(m[2], 10);
+  if (VCFG.prizes[prize] !== min) return null;
+  if (!m[1]){
+    var b = VCFG.blocks[prize];
+    if (num < b[0] || num > b[1]) return null;
+  }
+  return { code: VCFG.codePrefix + m[1] + m[2], prize: prize, min: min };
+}
+function money(n){ return "$" + Number(n).toLocaleString("en-US"); }
+</script>
+
+<script>
+"use strict";
+var TERMS = "One free spin per customer. One voucher per customer. Not stackable with today’s purchases. " +
+  "One discount per transaction. Good on any vehicle repair or installation. Minimum purchase is calculated " +
+  "before tax and before the discount is applied. Not redeemable for cash and no cash value. Cannot be combined " +
+  "with any other promotion — where more than one offer applies, you receive whichever single discount is " +
+  "greater. Service must be booked on or before " + VCFG.deadlineTxt + ". A $50 deposit secures your appointment " +
+  "and is applied toward your final balance. Steinman Auto & Audio reserves the right to verify vouchers.";
+
+var W = 1080, H = 1350;
+var BIG  = "'Arial Black','Helvetica Neue',Arial,sans-serif";
+var BODY = "'Helvetica Neue',Arial,sans-serif";
+var MONO = "'Courier New',Courier,monospace";
+
+function $(id){ return document.getElementById(id); }
+
+function loadImg(src){
+  return new Promise(function(res){
+    var im = new Image();
+    im.onload = function(){ res(im); };
+    im.onerror = function(){ res(null); };   // draw the voucher anyway, without that logo
+    im.src = src;
+  });
+}
+
+/* Largest font size (down to `floor`) at which `text` fits in `maxW`. */
+function fit(g, text, weight, start, floor, family, maxW){
+  for (var s = start; s > floor; s -= 1){
+    g.font = weight + " " + s + "px " + family;
+    if (g.measureText(text).width <= maxW) return s;
+  }
+  g.font = weight + " " + floor + "px " + family;
+  return floor;
+}
+
+function wrap(g, text, x, y, maxW, lineH){
+  var words = text.split(" "), line = "";
+  for (var i = 0; i < words.length; i++){
+    var t = line ? line + " " + words[i] : words[i];
+    if (g.measureText(t).width > maxW && line){ g.fillText(line, x, y); y += lineH; line = words[i]; }
+    else line = t;
+  }
+  if (line) g.fillText(line, x, y);
+  return y + lineH;
+}
+
+function roundRect(g, x, y, w, h, r){
+  g.beginPath();
+  g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+function drawLogo(g, im, cx, cy, maxW, maxH){
+  if (!im) return;
+  var s = Math.min(maxW / im.width, maxH / im.height), w = im.width * s, h = im.height * s;
+  g.drawImage(im, cx - w / 2, cy - h / 2, w, h);
+}
+
+function drawVoucher(v, auto, audio){
+  var cv = document.createElement("canvas");
+  cv.width = W; cv.height = H;
+  var g = cv.getContext("2d");
+
+  g.fillStyle = "#111111"; g.fillRect(0, 0, W, H);
+
+  /* logos, exactly as supplied in assets/ */
+  drawLogo(g, auto, 330, 105, 300, 140);
+  drawLogo(g, audio, 750, 105, 330, 120);
+  g.fillStyle = "#FFD52A"; g.fillRect(538, 50, 4, 110);
+  if (!auto && !audio){
+    g.font = "900 44px " + BIG; g.textAlign = "center"; g.fillText("STEINMAN AUTO & AUDIO", W / 2, 120); g.textAlign = "left";
+  }
+
+  g.fillStyle = "#FFD52A"; g.textAlign = "center";
+  g.font = "900 30px " + BIG;
+  g.fillText("TRUNK OR TREAT 2026  ·  SPIN TO WIN", W / 2, 232);
+  g.textAlign = "left";
+
+  /* white card */
+  var X = 60, Y = 270, CW = W - 120, CH = H - 270 - 50, P = 56, inner = CW - P * 2;
+  g.fillStyle = "#FFFFFF"; roundRect(g, X, Y, CW, CH, 28); g.fill();
+
+  var x = X + P, y = Y + 210;
+  g.fillStyle = "#111111";
+  g.font = "900 200px " + BIG;
+  g.fillText("$" + v.prize, x - 6, y);
+  g.font = "900 58px " + BIG;
+  g.fillText("OFF", x, y + 70);
+
+  /* minimum, in a yellow band */
+  var minTxt = "ON ANY REPAIR OR INSTALL OF " + money(v.min) + " OR MORE";
+  var fs = fit(g, minTxt, "900", 36, 22, BIG, inner - 40);
+  g.fillStyle = "#FFD52A"; g.fillRect(x, y + 110, inner, fs + 34);
+  g.fillStyle = "#111111"; g.fillText(minTxt, x + 20, y + 110 + fs + 10);
+
+  /* the code */
+  y = y + 110 + fs + 34 + 40;
+  g.fillRect(x, y, inner, 4);
+  fit(g, v.code, "bold", 92, 50, MONO, inner);
+  g.fillText(v.code, x, y + 98);
+  g.fillRect(x, y + 128, inner, 4);
+
+  y += 200;
+  g.font = "bold 40px " + BODY;
+  g.fillText("Book by " + VCFG.deadlineTxt + ".", x, y);
+  g.fillStyle = "#444444"; g.font = "32px " + BODY;
+  g.fillText("Steinman Auto & Audio · Rockford, IL", x, y + 50);
+  g.fillText(VCFG.phone + " · " + VCFG.email, x, y + 94);
+
+  /* terms */
+  y += 140;
+  g.strokeStyle = "#BBBBBB"; g.lineWidth = 2;
+  if (g.setLineDash) g.setLineDash([10, 8]);
+  g.beginPath(); g.moveTo(x, y); g.lineTo(x + inner, y); g.stroke();
+  if (g.setLineDash) g.setLineDash([]);
+  g.fillStyle = "#555555"; g.font = "21px " + BODY;
+  wrap(g, TERMS, x, y + 40, inner, 29);
+
+  return cv;
+}
+
+function show(v){
+  Promise.all([loadImg("steinman_auto.png"), loadImg("steinman_audio.png")]).then(function(logos){
+    var cv = drawVoucher(v, logos[0], logos[1]);
+    $("vimg").src = cv.toDataURL("image/png");
+    $("ok").classList.remove("hide");
+
+    var name = "Steinman-voucher-" + v.code + ".png";
+    $("saveBtn").addEventListener("click", function(){
+      cv.toBlob(function(blob){
+        try {
+          var file = new File([blob], name, { type: "image/png" });
+          if (navigator.canShare && navigator.canShare({ files: [file] })){
+            navigator.share({ files: [file], title: "Steinman voucher " + v.code })["catch"](function(){});
+            return;
+          }
+        } catch(e){}
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 500);
+      }, "image/png");
+    });
+
+    /* iPhone wants sms:NUMBER&body=, Android wants sms:NUMBER?body= */
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    var body = "My Steinman voucher " + v.code + ": $" + v.prize + " off any repair or install of " +
+               money(v.min) + " or more. Book by " + VCFG.deadlineTxt + ".";
+    $("textBtn").href = "sms:+1" + VCFG.textTo + (ios ? "&" : "?") + "body=" + encodeURIComponent(body);
+    $("callBtn").href = "tel:+1" + VCFG.phone.replace(/\D/g, "");
+    $("callBtn").textContent = "CALL TO BOOK · " + VCFG.phone;
+  });
+}
+
+var v = parseVoucher(location.hash);
+if (v) show(v);
+else {
+  $("lead").classList.add("hide");
+  $("bad").innerHTML = "This voucher link doesn’t look complete. Call us at <b>" + VCFG.phone +
+                       "</b> with your voucher code and we’ll look it up.";
+  $("bad").classList.remove("hide");
+}
+</script>
+</body>
+</html>
