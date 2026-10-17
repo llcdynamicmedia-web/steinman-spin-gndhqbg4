@@ -487,6 +487,12 @@ table.data tr:nth-child(even) td{background:#181818}
             <option value="ipad">iPad &mdash; customer wheel (second half of each pile)</option>
           </select></div></div>
       </div>
+      <div class="note">
+        <b>Staff PIN.</b> The default PIN can be read in this page's code, and the iPad copy is on a public web address, so set your own PIN on each device. It is saved on this device only.
+        <div class="frow" style="margin-top:10px"><div class="fld"><label>NEW PIN (4&ndash;8 DIGITS)</label>
+          <input id="pinNew" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></div></div>
+        <button class="btn dark sm" id="pinSave">SAVE NEW PIN</button>
+      </div>
       <div class="note" id="sysNote"></div>
       <div class="note warn">
         <b>Back up before you tear down.</b> These records live in this browser on this device only. They do not sync to your other devices, and clearing site data or browsing history will erase them. Press <b>BACKUP JSON</b> at least once mid-event and again before you close the laptop.
@@ -1538,6 +1544,12 @@ function go(){
     }
     DB.setStation(v); applyStation(); renderAdmin();
     toast("This device is now: " + STATIONS[v].name, 4200);
+  });
+  $("pinSave").addEventListener("click", function(){
+    var p = $("pinNew").value.trim();
+    if (!/^\d{4,8}$/.test(p)){ toast("The PIN has to be 4 to 8 digits."); return; }
+    DB.setPin(p); $("pinNew").value = "";
+    toast("New PIN saved on this device. Write it down for the staff.", 4200);
   });
   $("realBtn").addEventListener("click", openRealWheel);
   $("realCancel").addEventListener("click", function(){ $("ovReal").classList.remove("on"); });
