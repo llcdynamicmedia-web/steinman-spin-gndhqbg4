@@ -107,21 +107,14 @@ h1.big em{font-style:normal;color:var(--yellow)}
 }
 
 /* result */
-#resultCard{text-align:center;border-width:5px;background:#0D0D0D}
-.wonlabel{font-size:15px;font-weight:900;letter-spacing:5px;color:var(--yellow);margin-bottom:12px}
 .wonamt{
   font-size:clamp(64px,13vw,170px);font-weight:900;line-height:.86;letter-spacing:-6px;
   color:var(--yellow);text-shadow:0 0 44px rgba(255,213,42,.45);
 }
-.wonoff{font-size:clamp(22px,3.4vw,44px);font-weight:900;letter-spacing:7px;margin-top:4px}
 .wonmin{
   margin-top:20px;background:var(--yellow);color:var(--black);font-weight:900;
   font-size:clamp(14px,1.9vw,21px);padding:12px 18px;letter-spacing:.4px;
 }
-.wondead{margin-top:12px;color:#B8B8B8;font-size:14px;letter-spacing:1px}
-#resultCard.jackpot{border-color:var(--gold);box-shadow:0 0 0 7px rgba(232,162,0,.2),0 0 90px rgba(232,162,0,.4)}
-#jackpotTag{display:none;font-size:15px;font-weight:900;letter-spacing:6px;color:var(--gold);margin-bottom:6px}
-#resultCard.jackpot #jackpotTag{display:block;animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .pop{animation:pop .5s cubic-bezier(.2,1.5,.4,1)}
 @keyframes pop{0%{transform:scale(.55);opacity:0}100%{transform:scale(1);opacity:1}}
@@ -201,11 +194,16 @@ table.data tr:nth-child(even) td{background:#181818}
 /* misc */
 .storebadge{font-size:10.5px;letter-spacing:1.2px;color:var(--muted);margin-top:14px}
 /* The centre of the wheel is a spin button (Adam, 2026-10-16); it breathes while it is ready. */
+.vwon{font-size:clamp(24px,3.6vw,40px);letter-spacing:.5px}
+.vwon em{font-style:normal;color:var(--yellow)}
+.jtag{display:none;font-size:14px;font-weight:900;letter-spacing:6px;color:var(--gold);margin-bottom:2px}
+#voucherCard.jackpot{border-color:var(--gold);box-shadow:0 0 0 7px rgba(232,162,0,.2),0 0 90px rgba(232,162,0,.4)}
+#voucherCard.jackpot .jtag{display:block;animation:pulse 1s ease-in-out infinite}
+#voucherCard.jackpot .vwon em{color:var(--gold)}
 #hubBtn{cursor:pointer;transform-box:fill-box;transform-origin:center;-webkit-tap-highlight-color:transparent}
 #hubBtn.ready{animation:hubPulse 1.6s ease-in-out infinite}
 #hubBtn:active{transform:scale(.94)}
 @keyframes hubPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-#resultCard{cursor:pointer}
 .storebadge b{color:var(--yellow)}
 .storebadge.bad b{color:#FF7A6E}
 .hide{display:none !important}
@@ -314,21 +312,6 @@ table.data tr:nth-child(even) td{background:#181818}
 
 <canvas id="confetti"></canvas>
 
-<!-- RESULT -->
-<div class="overlay" id="ovResult">
-  <div class="card" id="resultCard">
-    <div id="jackpotTag">&#9733; JACKPOT &#9733;</div>
-    <div class="wonlabel">YOU WON</div>
-    <div class="wonamt" id="wonAmt">$75</div>
-    <div class="wonoff">OFF</div>
-    <div class="wonmin" id="wonMin">Valid on any repair or installation of $500 or more.</div>
-    <div class="wondead">Book by November 24, 2026 &nbsp;&middot;&nbsp; One per customer &nbsp;&middot;&nbsp; Not stackable with today&rsquo;s purchases &nbsp;&middot;&nbsp; No cash value</div>
-    <div class="btnrow" style="justify-content:center">
-      <button class="btn huge" id="toVoucherBtn">CONTINUE</button>
-    </div>
-  </div>
-</div>
-
 <!-- REAL WHEEL (Mac only) -->
 <div class="overlay" id="ovReal">
   <div class="card" style="max-width:640px">
@@ -342,9 +325,11 @@ table.data tr:nth-child(even) td{background:#181818}
 </div>
 
 <!-- VOUCHER -->
+<!-- VOUCHER: shown straight after the spin (Adam, 2026-10-16: merged the old "You won" card in) -->
 <div class="overlay" id="ovVoucher">
-  <div class="card">
-    <h2 class="noprint">Your voucher</h2>
+  <div class="card" id="voucherCard">
+    <div class="jtag noprint">&#9733; JACKPOT &#9733;</div>
+    <h2 class="noprint vwon" id="vWon">YOU WON <em>$75 OFF!</em></h2>
     <p class="leadtext noprint" style="margin-top:4px">Scan the code with your phone to save it.</p>
     <div class="voucher" id="voucherEl">
       <div class="vhead">
@@ -388,11 +373,11 @@ table.data tr:nth-child(even) td{background:#181818}
     <p class="leadtext" style="margin-top:4px" id="formSub">Just the basics &mdash; we'll call you to confirm.</p>
     <div class="frow">
       <div class="fld"><label>FIRST NAME *</label><input id="fFirst" autocomplete="given-name" autocapitalize="words"></div>
-      <div class="fld"><label>LAST NAME *</label><input id="fLast" autocomplete="family-name" autocapitalize="words"></div>
+      <div class="fld"><label id="lblLast">LAST NAME *</label><input id="fLast" autocomplete="family-name" autocapitalize="words"></div>
     </div>
     <div class="frow">
-      <div class="fld"><label>PHONE *</label><input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="815-555-0123"></div>
-      <div class="fld"><label>EMAIL (OPTIONAL)</label><input id="fEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off"></div>
+      <div class="fld"><label id="lblPhone">PHONE *</label><input id="fPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="815-555-0123"></div>
+      <div class="fld"><label id="lblEmail">EMAIL (OPTIONAL)</label><input id="fEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off"></div>
     </div>
     <div class="frow">
       <div class="fld sm"><label>YEAR</label><input id="fYear" inputmode="numeric" maxlength="4" placeholder="2019"></div>
@@ -422,6 +407,21 @@ table.data tr:nth-child(even) td{background:#181818}
     <div class="btnrow" style="margin-top:6px">
       <button class="btn" id="saveBtn">SAVE</button>
       <button class="btn dark" id="skipBtn">SKIP &mdash; JUST THE VOUCHER</button>
+    </div>
+  </div>
+</div>
+
+<!-- ASK: someone skipped the form -- offer once to email their voucher (Adam, 2026-10-16) -->
+<div class="overlay" id="ovAsk">
+  <div class="card" style="max-width:560px">
+    <h2>Want your voucher <em style="font-style:normal;color:var(--yellow)">emailed</em> to you?</h2>
+    <p class="leadtext" style="margin-top:6px">Just your email &mdash; we'll send it right now so you don't lose it.</p>
+    <div class="frow" style="margin-top:14px"><div class="fld"><label>EMAIL</label>
+      <input id="askEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" placeholder="you@example.com"></div></div>
+    <div class="err" id="askErr"></div>
+    <div class="btnrow" style="margin-top:6px">
+      <button class="btn" id="askSend">EMAIL MY VOUCHER</button>
+      <button class="btn dark" id="askNo">NO THANKS</button>
     </div>
   </div>
 </div>
@@ -1256,10 +1256,10 @@ function award(prize, slot, source){
   var rec = issueVoucher(prize, slot, source), code = rec.voucher, isOverflow = rec.overflow;
   pending = rec;
 
-  $("wonAmt").textContent = "$" + prize.amt;
-  $("wonMin").textContent = "Valid on any repair or installation of " + money(prize.min) + " or more.";
-  $("resultCard").classList.toggle("jackpot", jack);
-  $("resultCard").classList.remove("pop"); void $("resultCard").offsetWidth; $("resultCard").classList.add("pop");
+  /* Straight to the voucher -- one screen, not "You won" then "Continue" (Adam, 2026-10-16). */
+  $("vWon").innerHTML = "YOU WON <em>$" + prize.amt + " OFF!</em>";
+  $("voucherCard").classList.toggle("jackpot", jack);
+  $("voucherCard").classList.remove("pop"); void $("voucherCard").offsetWidth; $("voucherCard").classList.add("pop");
 
   $("vAmt").innerHTML = "$" + prize.amt + "<small>OFF</small>";
   $("vMin").textContent = "ON ANY REPAIR OR INSTALL OF " + money(prize.min) + " OR MORE";
@@ -1269,7 +1269,7 @@ function award(prize, slot, source){
   if (isOverflow){
     toast("PRINTED $" + prize.amt + " VOUCHERS ARE GONE \u2014 write a backup slip, code " + code, 9000);
   }
-  $("ovResult").classList.add("on");
+  $("ovVoucher").classList.add("on");
   $("rimGlow").style.opacity = "1";
   fanfare(jack); confetti(jack);
 }
@@ -1347,7 +1347,12 @@ function openForm(mode){
   $("formTitle").textContent = mode === "book" ? "Book my appointment" : "Save my voucher";
   $("formSub").textContent = mode === "book"
     ? "Just the basics — we'll call you to confirm your appointment."
-    : "So we can look your voucher up when you're ready. Nothing else needed.";
+    : "Add your email and we'll send your voucher right now. Or a phone number so we can look it up.";
+  /* Booking needs a full name and phone to call back; a voucher needs a first name and
+     either a phone or an email (Adam, 2026-10-16: make it easy, but get the email). */
+  $("lblLast").textContent  = mode === "book" ? "LAST NAME *" : "LAST NAME";
+  $("lblPhone").textContent = mode === "book" ? "PHONE *" : "PHONE (OR EMAIL)";
+  $("lblEmail").textContent = "EMAIL (WE'LL SEND YOUR VOUCHER)";
   var bo = document.querySelectorAll(".bookonly");
   for (var i=0;i<bo.length;i++) bo[i].classList.toggle("hide", mode !== "book");
   $("formErr").textContent = "";
@@ -1358,13 +1363,27 @@ function openForm(mode){
 
 function digits(s){ return String(s||"").replace(/\D/g,""); }
 
+function validEmail(e){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e || "").trim()); }
+
 function saveForm(){
   var f = $("fFirst").value.trim(), l = $("fLast").value.trim(), p = digits($("fPhone").value);
-  var bad = false;
-  $("fFirst").classList.toggle("bad", !f); if (!f) bad = true;
-  $("fLast").classList.toggle("bad", !l);  if (!l) bad = true;
-  $("fPhone").classList.toggle("bad", p.length < 10); if (p.length < 10) bad = true;
-  if (bad){ $("formErr").textContent = "Name and a 10-digit phone number are needed to save this."; return; }
+  var em = $("fEmail").value.trim(), bad = false;
+  if (em && !validEmail(em)){
+    $("fEmail").classList.add("bad"); $("formErr").textContent = "That email doesn't look right — check it, or leave it blank."; return;
+  }
+  $("fEmail").classList.remove("bad");
+  if (formMode === "book"){
+    $("fFirst").classList.toggle("bad", !f); if (!f) bad = true;
+    $("fLast").classList.toggle("bad", !l);  if (!l) bad = true;
+    $("fPhone").classList.toggle("bad", p.length < 10); if (p.length < 10) bad = true;
+    if (bad){ $("formErr").textContent = "Name and a 10-digit phone number are needed to book."; return; }
+  } else {
+    var reach = p.length >= 10 || !!em;
+    $("fFirst").classList.toggle("bad", !f); if (!f) bad = true;
+    $("fPhone").classList.toggle("bad", !reach); $("fEmail").classList.toggle("bad", !reach); if (!reach) bad = true;
+    $("fLast").classList.remove("bad");
+    if (bad){ $("formErr").textContent = "Add your first name and an email or phone so we can send your voucher."; return; }
+  }
 
   pending.first = f; pending.last = l;
   pending.phone = $("fPhone").value.trim();
@@ -1386,14 +1405,15 @@ function saveForm(){
     ? "You're on the books. Voucher <b>" + esc(pending.voucher) + "</b> is attached to your appointment" +
       (pending.deposit ? " and your " + money(pending.deposit) + " deposit comes off the balance." : ".")
     : "Voucher <b>" + esc(pending.voucher) + "</b> is saved under your name. Call us by <b>" + CFG.deadlineTxt + "</b>.";
+  if (pending.email) $("doneMsg").innerHTML += "<br>We're emailing it to <b>" + esc(pending.email) + "</b> now.";
   $("ovForm").classList.remove("on");
   $("ovDone").classList.add("on");
 }
 
 function resetKiosk(){
   pending = null;
-  ["ovResult","ovVoucher","ovForm","ovDone"].forEach(function(id){ $(id).classList.remove("on"); });
-  ["fFirst","fLast","fPhone","fEmail","fYear","fMake","fModel","fAppt","fNotes"].forEach(function(id){
+  ["ovVoucher","ovForm","ovAsk","ovDone"].forEach(function(id){ $(id).classList.remove("on"); });
+  ["fFirst","fLast","fPhone","fEmail","fYear","fMake","fModel","fAppt","fNotes","askEmail"].forEach(function(id){
     $(id).value = ""; $(id).classList.remove("bad");
   });
   $("fService").value = ""; $("fDeposit").value = "0"; $("fConsent").checked = false;
@@ -1652,9 +1672,6 @@ function go(){
   paintFsBtn();
   document.addEventListener("fullscreenchange", paintFsBtn);
   document.addEventListener("webkitfullscreenchange", paintFsBtn);
-  $("resultCard").addEventListener("click", function(e){
-    if (e.target.id !== "toVoucherBtn") $("toVoucherBtn").click();   // tap anywhere on "You won"
-  });
   $("fsBtn").addEventListener("click", function(){
     audioOn();
     var d = document.documentElement;
@@ -1662,16 +1679,38 @@ function go(){
     else if (document.exitFullscreen && document.fullscreenElement) document.exitFullscreen();
     else toast("Full screen isn't available in this browser — use Safari's Add to Home Screen instead.", 4200);
   });
-  $("toVoucherBtn").addEventListener("click", function(){
-    $("ovResult").classList.remove("on"); $("ovVoucher").classList.add("on");
-  });
   $("bookBtn").addEventListener("click", function(){ openForm("book"); });
   $("leadBtn").addEventListener("click", function(){ openForm("lead"); });
   $("printVBtn").addEventListener("click", function(){ window.print(); });
   $("saveBtn").addEventListener("click", saveForm);
+  /* Skipping the form: if they typed an email anyway, send it; otherwise ask once. */
+  function emailOnly(email){
+    pending.email = email.trim();
+    pending.first = $("fFirst").value.trim(); pending.last = $("fLast").value.trim();
+    if (digits($("fPhone").value).length >= 10) pending.phone = $("fPhone").value.trim();
+    persist(); sendBookings();
+    $("doneMsg").innerHTML = "Your voucher <b>" + esc(pending.voucher) + "</b> is on its way to <b>" + esc(pending.email) +
+                             "</b>.<br>Check your inbox (and spam folder) in a minute.";
+    ["ovForm","ovAsk"].forEach(function(id){ $(id).classList.remove("on"); });
+    $("ovDone").classList.add("on");
+  }
   $("skipBtn").addEventListener("click", function(){
+    var typed = $("fEmail").value.trim();
+    if (validEmail(typed)){ emailOnly(typed); return; }
+    $("askErr").textContent = ""; $("askEmail").value = typed;
+    $("ovForm").classList.remove("on"); $("ovAsk").classList.add("on");
+    setTimeout(function(){ $("askEmail").focus(); }, 120);
+  });
+  $("askSend").addEventListener("click", function(){
+    var e = $("askEmail").value.trim();
+    if (!validEmail(e)){ $("askEmail").classList.add("bad"); $("askErr").textContent = "That email doesn't look right — check it and try again."; return; }
+    $("askEmail").classList.remove("bad");
+    emailOnly(e);
+  });
+  $("askEmail").addEventListener("keydown", function(e){ if (e.key === "Enter") $("askSend").click(); });
+  $("askNo").addEventListener("click", function(){
     $("doneMsg").innerHTML = "Voucher <b>" + esc(pending.voucher) + "</b> is yours. Hang on to it — we'll need the code when you book.";
-    $("ovForm").classList.remove("on"); $("ovDone").classList.add("on");
+    $("ovAsk").classList.remove("on"); $("ovDone").classList.add("on");
   });
   $("nextBtn").addEventListener("click", resetKiosk);
 
