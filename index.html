@@ -1023,16 +1023,33 @@ function buildWheel(){
     out.push('<path d="M'+cx+','+cy+' L'+p0[0].toFixed(2)+','+p0[1].toFixed(2)+
              ' A'+R+','+R+' 0 0 1 '+p1[0].toFixed(2)+','+p1[1].toFixed(2)+
              ' Z" fill="'+fill+'" stroke="#FFFFFF" stroke-width="3"/>');
-    var lp = polar(cx,cy,LR,mid);
-    var rr = (mid > 90 && mid < 270) ? mid - 180 : mid;
+    var lp = polar(cx,cy,LR,mid), xy = lp[0].toFixed(2)+','+lp[1].toFixed(2);
+    var rr = labelFlipped(mid, rot) ? mid - 180 : mid;
     var big = s.amt >= 100 ? 35 : 44;
-    out.push('<g transform="translate('+lp[0].toFixed(2)+','+lp[1].toFixed(2)+') rotate('+rr.toFixed(2)+')">'+
+    out.push('<g data-mid="'+mid+'" data-xy="'+xy+'" transform="translate('+xy+') rotate('+rr.toFixed(2)+')">'+
       '<text text-anchor="middle" y="-2" font-family="Arial Black,Arial" font-size="'+big+'" font-weight="900" fill="'+main+'">$'+s.amt+'</text>'+
       '<text text-anchor="middle" y="20" font-family="Arial Black,Arial" font-size="15" font-weight="900" letter-spacing="1.4" fill="'+main+'">OFF</text>'+
       '<text text-anchor="middle" y="36.5" font-family="Arial,Helvetica" font-size="12.5" font-weight="bold" letter-spacing=".5" fill="'+sub+'">MIN '+money(s.min)+'</text>'+
       '</g>');
   }
   $("wheelRotor").innerHTML = out.join("");
+}
+
+/* A label reads upright while its slice is in the top half of the SCREEN. The wheel
+   turns, so this depends on where it stopped, not where the slice sits on the wheel;
+   flipping by wheel position showed a bottom slice's prize upside down under the
+   pointer once it landed there (Adam: "the $25 is upside down"). */
+function labelFlipped(mid, wheelRot){
+  var a = ((mid + wheelRot) % 360 + 360) % 360;
+  return a > 90 && a < 270;
+}
+function orientLabels(wheelRot){
+  var gs = $("wheelRotor").querySelectorAll("g[data-mid]");
+  for (var i=0;i<gs.length;i++){
+    var mid = +gs[i].getAttribute("data-mid");
+    gs[i].setAttribute("transform", "translate(" + gs[i].getAttribute("data-xy") + ") rotate(" +
+      (labelFlipped(mid, wheelRot) ? mid - 180 : mid).toFixed(2) + ")");
+  }
 }
 
 /* easing: cubic-bezier(.22,0,.12,1) — eases IN off the line, then a long ease OUT */
@@ -1044,13 +1061,26 @@ function bez(t, x1, y1, x2, y2){
   return cy(u);
 }
 
-/* ---------- sound ---------- */
+/* ---------- sound ----------
+   iPad/iPhone rules (no sound on the iPad, Adam 2026-10-16): audio may only start
+   inside a real tap (touchend/click, not touchstart); something must actually play
+   during that tap to unlock it; silent mode mutes web audio unless the page asks for
+   "playback"; and after locking or switching apps the context is "interrupted",
+   not "suspended". audioOn() handles all four and is safe to call on every tap. */
 var AC = null;
 function audioOn(){
   try {
+    if (navigator.audioSession) navigator.audioSession.type = "playback";   // Safari 16.4+
+  } catch(e){}
+  try {
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
-    if (AC.state === "suspended") AC.resume();
-  } catch(e){ AC = null; }
+  } catch(e){ AC = null; return; }
+  try { if (AC.state !== "running" && AC.resume) AC.resume(); } catch(e){}
+  try {
+    var b = AC.createBuffer(1, 1, 22050), src = AC.createBufferSource();   // one silent sample
+    src.buffer = b; src.connect(AC.destination);
+    if (src.start) src.start(0); else src.noteOn(0);
+  } catch(e){}
 }
 function tick(vel){
   if (!AC) return;
@@ -1171,6 +1201,7 @@ function land(k){
   rot = rotationFor(k, 0, 0) % 360;                   // normalise, same slot
   rot = ((rot % 360) + 360) % 360;
   $("wheelRotor").setAttribute("transform", "rotate(" + rot.toFixed(3) + " 310 340)");
+  orientLabels(rot);
 
   /* the single source of truth: whatever is physically under the pointer wins */
   var idx = segUnderPointer(rot);
@@ -1602,8 +1633,10 @@ function go(){
     records = []; persist(); renderAdmin(); toast("All records deleted.");
   });
 
-  ["click","touchstart","keydown"].forEach(function(ev){
-    document.addEventListener(ev, function once(){ audioOn(); document.removeEventListener(ev, once); }, {passive:true});
+  /* Keep offering to unlock sound on every tap until it is running -- the first touch
+     on an iPad often doesn't count, and locking the screen stops it again. */
+  ["touchend","click","keydown"].forEach(function(ev){
+    document.addEventListener(ev, function(){ if (!AC || AC.state !== "running") audioOn(); }, {passive:true});
   });
   window.addEventListener("beforeunload", function(e){
     if (DB.mode() !== "localStorage" && records.length){ e.preventDefault(); e.returnValue = ""; }
