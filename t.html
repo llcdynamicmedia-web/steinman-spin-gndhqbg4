@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#111111">
+<title>Text Customer</title>
+<!--
+  Opens Messages with a customer's number and their voucher text filled in.
+  Gmail strips sms: links from emails, so the "Text this customer their voucher"
+  button in Adam's booking email points here instead (Adam, 2026-10-16).
+  The link is  .../t#18155550100|<message>  -- everything after "#" stays on the
+  phone; browsers never send it to the server. Hand-edited, no build step;
+  published by publish_ipad.py.
+-->
+<style>
+body{ margin:0; background:#111111; color:#FFFFFF; font-family:-apple-system,"Helvetica Neue",Arial,sans-serif }
+.wrap{ max-width:520px; margin:0 auto; padding:28px 16px }
+h1{ font:900 24px "Arial Black",Arial,sans-serif; margin:0 0 6px } h1 em{ font-style:normal; color:#FFD52A }
+.msg{ background:#242424; border-left:4px solid #FFD52A; border-radius:8px; padding:14px; margin:14px 0; line-height:1.45; white-space:pre-wrap; word-break:break-word }
+.btn{ display:block; text-align:center; background:#FFD52A; color:#111111; text-decoration:none; padding:17px; border-radius:10px; font:900 18px "Arial Black",Arial,sans-serif }
+.hint{ color:#999999; font-size:13px; text-align:center; margin-top:10px }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TEXT <em>CUSTOMER</em></h1>
+  <div id="to"></div>
+  <div class="msg" id="msg"></div>
+  <a class="btn" id="go">OPEN MESSAGES</a>
+  <p class="hint">Check it, then hit send.</p>
+</div>
+<script>
+"use strict";
+/* "#18155550100|Hi Pat..." -> sms: link, or null if the link was cut off or edited. */
+function parseText(hash, ios){
+  var h = String(hash || "").replace(/^#/, ""), bar = h.indexOf("|");
+  if (bar < 0) return null;
+  var to = decodeURIComponent(h.slice(0, bar)).replace(/\D/g, ""), body = decodeURIComponent(h.slice(bar + 1));
+  if (to.length === 10) to = "1" + to;
+  if (to.length !== 11 || !body) return null;
+  /* iPhone wants sms:NUMBER&body=, Android wants sms:NUMBER?body= */
+  return { to: to, body: body, href: "sms:+" + to + (ios ? "&" : "?") + "body=" + encodeURIComponent(body) };
+}
+var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+var t = null;
+try { t = parseText(location.hash, ios); } catch(e){ t = null; }
+if (t){
+  var d = t.to.slice(1);
+  document.getElementById("to").textContent = "To: " + d.slice(0,3) + "-" + d.slice(3,6) + "-" + d.slice(6);
+  document.getElementById("msg").textContent = t.body;
+  document.getElementById("go").href = t.href;
+  location.href = t.href;      // most phones open Messages straight away; the button is the fallback
+} else {
+  document.getElementById("msg").textContent = "This link looks incomplete. Use the phone number in the booking email instead.";
+  document.getElementById("go").style.display = "none";
+}
+</script>
+</body>
+</html>
