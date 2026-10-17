@@ -1363,7 +1363,7 @@ function saveForm(){
     pending.status = "booked";
   }
   persist();
-  if (formMode === "book") sendBookings();
+  sendBookings();
   $("doneMsg").innerHTML = formMode === "book"
     ? "You're on the books. Voucher <b>" + esc(pending.voucher) + "</b> is attached to your appointment" +
       (pending.deposit ? " and your " + money(pending.deposit) + " deposit comes off the balance." : ".")
@@ -1388,18 +1388,30 @@ function resetKiosk(){
 }
 
 /* ---------- booking emails ----------
-   A booking waits on this device until Google says it got it, and is retried every
-   minute and whenever the signal comes back. The script ignores a booking id it has
+   Every customer who fills in the form goes to Adam's Google script: bookings (Adam is
+   emailed, and so is the customer if they gave an email) and voucher-only "Take my
+   voucher" customers (a sheet row, plus their voucher by email if they gave one).
+   A record waits on this device until Google says it got it, and is retried every
+   minute and whenever the signal comes back. The script ignores an id + kind it has
    already seen, so a retry can never send a second email. */
+function recordKind(r){
+  if (r.status === "booked") return "booking";
+  if (r.status === "lead" && (r.email || digits(r.phone).length >= 10)) return "voucher";
+  return "";                                       // skipped the form, or already redeemed
+}
+function sentKind(r){ return r.sentKind || (r.emailedAt ? "booking" : ""); }   // older records were bookings
 function bookingPayload(r){
-  return { token: CFG.bookingToken, id: r.id, ts: r.ts, device: STATIONS[DB.getStation()].tag || "kiosk",
+  return { token: CFG.bookingToken, id: r.id, kind: recordKind(r) || "booking", ts: r.ts, device: STATIONS[DB.getStation()].tag || "kiosk",
            voucher: r.voucher, prize: r.prize, minSpend: r.minSpend, first: r.first, last: r.last,
            phone: r.phone, email: r.email, year: r.year, make: r.make, model: r.model, service: r.service,
            appt: r.appt, deposit: r.deposit, notes: r.notes, consent: !!r.consent };
 }
 function unsentBookings(){
   var out = [];
-  for (var i=0;i<records.length;i++) if (records[i].status === "booked" && !records[i].emailedAt) out.push(records[i]);
+  for (var i=0;i<records.length;i++){
+    var r = records[i], k = recordKind(r), done = sentKind(r);
+    if (k && done !== k && done !== "booking") out.push(r);   // a booking already covers its voucher
+  }
   return out;
 }
 var sendingBookings = false;
@@ -1410,12 +1422,12 @@ function sendBookings(){
   sendingBookings = true;
   (function next(){
     if (i >= list.length){ sendingBookings = false; return; }
-    var r = list[i++];
+    var r = list[i++], payload = bookingPayload(r);
     fetch(CFG.bookingHook, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-                             body: JSON.stringify(bookingPayload(r)) })   // text/plain: no CORS preflight
+                             body: JSON.stringify(payload) })   // text/plain: no CORS preflight
       .then(function(res){ return res.json(); })
       .then(function(j){
-        if (j && j.ok){ r.emailedAt = new Date().toISOString(); persist(); }
+        if (j && j.ok){ r.emailedAt = new Date().toISOString(); r.sentKind = payload.kind; persist(); }
         next();
       })["catch"](function(){ sendingBookings = false; });   // no signal: the next retry picks it up
   })();
@@ -1481,7 +1493,7 @@ function renderAdmin(){
     "Storage in use: <b>" + (DB.mode() === "localStorage" ? "localStorage (this browser, this device)" : "MEMORY ONLY — nothing is being saved") + "</b><br>" +
     "Records held: <b>" + spins + "</b><br>" +
     "Page address: <b>" + esc(location.protocol) + "</b><br>" +
-    "Booking emails: <b>" + (CFG.bookingHook ? (unsentBookings().length ? unsentBookings().length + " waiting to send (needs signal)" : "on, all sent") : "off") + "</b><br><br>" +
+    "Sending to Google (booking + customer emails): <b>" + (CFG.bookingHook ? (unsentBookings().length ? unsentBookings().length + " waiting to send (needs signal)" : "on, all sent") : "off") + "</b><br><br>" +
     "If you run the kiosk on a second device, that device keeps its own separate list. Nothing syncs between them automatically — export each one and combine them afterwards. Staff PIN is a speed bump to keep customers out of this screen, not real security: anyone who can open this file's source can read it.";
 }
 
@@ -1503,9 +1515,10 @@ function renderRecords(){
       '</td><td>' + esc(r.phone) + '</td><td>' + esc(veh) + '</td><td>' + esc(r.service) + '</td><td>' + esc(r.appt) +
       '</td><td>' + (r.deposit ? money(r.deposit) : "") + '</td><td><span class="pill ' + st +
       '" style="cursor:pointer" data-cycle="' + esc(r.id) + '">' + lbl + '</span>' +
-      (CFG.bookingHook && r.status === "booked"
-        ? (r.emailedAt ? ' <span style="color:#7BD88F;font-size:11px">&#10003; emailed</span>'
-                       : ' <span style="color:#FFD52A;font-size:11px">waiting to email</span>') : '') +
+      (CFG.bookingHook && recordKind(r)
+        ? (sentKind(r) === recordKind(r) || sentKind(r) === "booking"
+            ? ' <span style="color:#7BD88F;font-size:11px">&#10003; sent</span>'
+            : ' <span style="color:#FFD52A;font-size:11px">waiting to send</span>') : '') +
       '</td></tr>');
   });
   if (!shown) rows.push('<tr><td colspan="10" style="color:#777;padding:18px">No matching records.</td></tr>');
