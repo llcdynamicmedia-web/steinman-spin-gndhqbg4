@@ -1417,12 +1417,20 @@ function unsentBookings(){
 var sendingBookings = false;
 function sendBookings(){
   if (!CFG.bookingHook || sendingBookings || !window.fetch) return;
-  var list = unsentBookings(), i = 0;
+  var list = unsentBookings(), i = 0, tried = {};
   if (!list.length) return;
   sendingBookings = true;
   (function next(){
-    if (i >= list.length){ sendingBookings = false; return; }
+    if (i >= list.length){
+      sendingBookings = false;
+      /* Someone saved while this batch was going out: send theirs now, not on the next
+         one-minute retry. Only records not tried this round, so a refusal can't loop. */
+      var more = unsentBookings();
+      for (var m=0;m<more.length;m++) if (!tried[more[m].id]){ setTimeout(sendBookings, 0); break; }
+      return;
+    }
     var r = list[i++], payload = bookingPayload(r);
+    tried[r.id] = 1;
     fetch(CFG.bookingHook, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
                              body: JSON.stringify(payload) })   // text/plain: no CORS preflight
       .then(function(res){ return res.json(); })
