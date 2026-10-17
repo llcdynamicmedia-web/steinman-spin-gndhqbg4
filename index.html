@@ -783,6 +783,12 @@ var CFG = {
      the kiosk does not. Leave "" to fall back to the text-message QR. Source is
      voucher_page/v.html, published by publish_ipad.py. */
   voucherPage:"https://llcdynamicmedia-web.github.io/steinman-spin-gndhqbg4/v",
+  /* Booking emails (Adam, 2026-10-16, option B). Each booking is posted to Adam's Google
+     Apps Script web app (google_script/BookingEmails.gs), which adds a row to his sheet
+     and emails it. "" = off. bookingToken must match TOKEN in that script; it only keeps
+     stray bots out, since this page is public. */
+  bookingHook: "",
+  bookingToken:"S0CAuGjrX-v54oVK",
   defaultPin: "2026",
   /* false = every spin uses the true printed odds (3/3/2/1/1 in 10). When a printed
              pile runs out the app keeps going with unlimited X-series codes and staff
@@ -1357,6 +1363,7 @@ function saveForm(){
     pending.status = "booked";
   }
   persist();
+  if (formMode === "book") sendBookings();
   $("doneMsg").innerHTML = formMode === "book"
     ? "You're on the books. Voucher <b>" + esc(pending.voucher) + "</b> is attached to your appointment" +
       (pending.deposit ? " and your " + money(pending.deposit) + " deposit comes off the balance." : ".")
@@ -1378,6 +1385,40 @@ function resetKiosk(){
   $("spinBtn").disabled = false;
   $("rimGlow").style.opacity = "0";
   paintStoreBadge();
+}
+
+/* ---------- booking emails ----------
+   A booking waits on this device until Google says it got it, and is retried every
+   minute and whenever the signal comes back. The script ignores a booking id it has
+   already seen, so a retry can never send a second email. */
+function bookingPayload(r){
+  return { token: CFG.bookingToken, id: r.id, ts: r.ts, device: STATIONS[DB.getStation()].tag || "kiosk",
+           voucher: r.voucher, prize: r.prize, minSpend: r.minSpend, first: r.first, last: r.last,
+           phone: r.phone, email: r.email, year: r.year, make: r.make, model: r.model, service: r.service,
+           appt: r.appt, deposit: r.deposit, notes: r.notes, consent: !!r.consent };
+}
+function unsentBookings(){
+  var out = [];
+  for (var i=0;i<records.length;i++) if (records[i].status === "booked" && !records[i].emailedAt) out.push(records[i]);
+  return out;
+}
+var sendingBookings = false;
+function sendBookings(){
+  if (!CFG.bookingHook || sendingBookings || !window.fetch) return;
+  var list = unsentBookings(), i = 0;
+  if (!list.length) return;
+  sendingBookings = true;
+  (function next(){
+    if (i >= list.length){ sendingBookings = false; return; }
+    var r = list[i++];
+    fetch(CFG.bookingHook, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+                             body: JSON.stringify(bookingPayload(r)) })   // text/plain: no CORS preflight
+      .then(function(res){ return res.json(); })
+      .then(function(j){
+        if (j && j.ok){ r.emailedAt = new Date().toISOString(); persist(); }
+        next();
+      })["catch"](function(){ sendingBookings = false; });   // no signal: the next retry picks it up
+  })();
 }
 
 /* ============================================================
@@ -1439,7 +1480,8 @@ function renderAdmin(){
   $("sysNote").innerHTML =
     "Storage in use: <b>" + (DB.mode() === "localStorage" ? "localStorage (this browser, this device)" : "MEMORY ONLY — nothing is being saved") + "</b><br>" +
     "Records held: <b>" + spins + "</b><br>" +
-    "Page address: <b>" + esc(location.protocol) + "</b><br><br>" +
+    "Page address: <b>" + esc(location.protocol) + "</b><br>" +
+    "Booking emails: <b>" + (CFG.bookingHook ? (unsentBookings().length ? unsentBookings().length + " waiting to send (needs signal)" : "on, all sent") : "off") + "</b><br><br>" +
     "If you run the kiosk on a second device, that device keeps its own separate list. Nothing syncs between them automatically — export each one and combine them afterwards. Staff PIN is a speed bump to keep customers out of this screen, not real security: anyone who can open this file's source can read it.";
 }
 
@@ -1460,7 +1502,11 @@ function renderRecords(){
       money(r.minSpend) + '</td><td>' + nm + (r.consent ? ' <span style="color:#FFD52A" title="opted in">&#9993;</span>' : '') +
       '</td><td>' + esc(r.phone) + '</td><td>' + esc(veh) + '</td><td>' + esc(r.service) + '</td><td>' + esc(r.appt) +
       '</td><td>' + (r.deposit ? money(r.deposit) : "") + '</td><td><span class="pill ' + st +
-      '" style="cursor:pointer" data-cycle="' + esc(r.id) + '">' + lbl + '</span></td></tr>');
+      '" style="cursor:pointer" data-cycle="' + esc(r.id) + '">' + lbl + '</span>' +
+      (CFG.bookingHook && r.status === "booked"
+        ? (r.emailedAt ? ' <span style="color:#7BD88F;font-size:11px">&#10003; emailed</span>'
+                       : ' <span style="color:#FFD52A;font-size:11px">waiting to email</span>') : '') +
+      '</td></tr>');
   });
   if (!shown) rows.push('<tr><td colspan="10" style="color:#777;padding:18px">No matching records.</td></tr>');
   $("recTbl").innerHTML = rows.join("");
@@ -1470,7 +1516,7 @@ function cycleStatus(id){
   var r = null;
   for (var i=0;i<records.length;i++) if (records[i].id === id) r = records[i];
   if (!r) return;
-  if (r.status === "lead") r.status = "booked";
+  if (r.status === "lead"){ r.status = "booked"; setTimeout(sendBookings, 0); }
   else if (r.status === "booked"){
     var v = prompt("Marking " + r.voucher + " as REDEEMED.\n\nWhat was the total sale, before the " +
                    money(r.prize) + " discount?\n(Minimum for this voucher is " + money(r.minSpend) + ")", "");
@@ -1500,11 +1546,11 @@ function stamp(){ return new Date().toISOString().slice(0,10); }
 
 function exportLeads(){
   var rows = [["Voucher","Prize","MinSpend","First","Last","Phone","Email","Year","Make","Model",
-               "Service","Status","Appointment","Deposit","Sale","MarketingConsent","Notes","SpunAt","Wheel"]];
+               "Service","Status","Appointment","Deposit","Sale","MarketingConsent","Notes","SpunAt","Wheel","Emailed"]];
   records.forEach(function(r){
     rows.push([r.voucher,r.prize,r.minSpend,r.first,r.last,r.phone,r.email,r.year,r.make,r.model,
                r.service,(isExpired(r)?"expired":r.status),r.appt,r.deposit,r.sale,(r.consent?"YES":"no"),r.notes,r.ts,
-               (r.source === "real" ? "real wheel" : "screen")]);
+               (r.source === "real" ? "real wheel" : "screen"), r.emailedAt || ""]);
   });
   download("steinman_tot2026_leads_" + stamp() + ".csv", csv(rows), "text/csv;charset=utf-8");
   toast("Leads CSV downloaded");
@@ -1612,6 +1658,9 @@ function go(){
     toast("New PIN saved on this device. Write it down for the staff.", 4200);
   });
   $("realBtn").addEventListener("click", openRealWheel);
+  sendBookings();
+  setInterval(sendBookings, 60000);
+  window.addEventListener("online", sendBookings);
   $("realCancel").addEventListener("click", function(){ $("ovReal").classList.remove("on"); });
   $("realGrid").addEventListener("click", function(e){
     var el = e.target.closest ? e.target.closest("[data-amt]") : null;
