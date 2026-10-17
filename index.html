@@ -471,7 +471,7 @@ table.data tr:nth-child(even) td{background:#181818}
 
     <div id="tabSum">
       <div class="kpis" id="kpiGrid"></div>
-      <h2 style="font-size:17px;margin:22px 0 8px" id="stockHead">Printed voucher stock</h2>
+      <h2 style="font-size:17px;margin:22px 0 8px" id="stockHead">Vouchers given out on this device</h2>
       <table class="data" id="stockTbl"></table>
       <h2 style="font-size:17px;margin:22px 0 8px">Prize distribution</h2>
       <table class="data" id="distTbl"></table>
@@ -486,12 +486,12 @@ table.data tr:nth-child(even) td{background:#181818}
 
     <div id="tabSys" class="hide">
       <div class="note">
-        <b>This device.</b> Set this once on each device before the event. With two devices, each one gives out codes from its own half of every printed pile, so two customers can never get the same code.
+        <b>This device.</b> Set this once on each device before the event. With two devices, each one gives out its own set of voucher codes, so two customers can never get the same code.
         <div class="frow" style="margin-top:10px"><div class="fld"><label>THIS DEVICE IS</label>
           <select id="stationSel">
-            <option value="">Only device &mdash; all 100 printed codes</option>
-            <option value="mac">Mac &mdash; staff station + real wheel (first half of each pile)</option>
-            <option value="ipad">iPad &mdash; customer wheel (second half of each pile)</option>
+            <option value="">Only device</option>
+            <option value="mac">Mac &mdash; staff station + real wheel</option>
+            <option value="ipad">iPad &mdash; customer wheel</option>
           </select></div></div>
       </div>
       <div class="note">
@@ -798,8 +798,8 @@ var CFG = {
   bookingToken:"S0CAuGjrX-v54oVK",
   defaultPin: "2026",
   /* false = every spin uses the true printed odds (3/3/2/1/1 in 10). When a printed
-             pile runs out the app keeps going with unlimited X-series codes and staff
-             write a backup slip.
+             pile runs out the app keeps going with unlimited X-series codes. (Since
+             2026-10-16 there are no paper vouchers; the "piles" are just code numbering.)
      true  = each spin draws one of the REMAINING printed slips at random, so the
              slips never run out and the night ends at exactly 30/30/20/10/10.
      Adam chose true on 2026-10-15, then false on 2026-10-16: "true odds but unlimited". */
@@ -919,8 +919,11 @@ function paintStoreBadge(){
 }
 function persist(){ DB.save(records); paintStoreBadge(); }
 
-/* ---------- printed voucher stock ----------
-   Adam printed 100 physical vouchers whose prize is PRE-ASSIGNED by code block.
+/* ---------- voucher codes ----------
+   Vouchers are digital only since 2026-10-16 (on screen, scanned to the phone, or
+   emailed) -- no paper slips are handed out. The code blocks below are kept as the
+   numbering scheme because they guarantee the Mac and iPad never issue the same code.
+   History: Adam first printed 100 physical vouchers whose prize is PRE-ASSIGNED by code block.
    A code is therefore only valid for its own prize: issuing them in spin order
    would hand a $200 winner a slip that reads $25. Always draw from the block that
    matches the prize the wheel actually landed on. */
@@ -938,9 +941,9 @@ var VOUCHER_BLOCKS = {
    owns its own half of every printed pile, and staff keep two separate stacks of
    slips. "Only device" keeps the whole block, exactly as before. */
 var STATIONS = {
-  "":     { name:"Only device \u2014 all 100 printed codes",                   tag:"",     half:0, x:"X"  },
-  "mac":  { name:"Mac \u2014 staff station + real wheel (first half of each pile)", tag:"MAC",  half:1, x:"XM" },
-  "ipad": { name:"iPad \u2014 customer wheel (second half of each pile)",          tag:"IPAD", half:2, x:"XI" }
+  "":     { name:"Only device",                        tag:"",     half:0, x:"X"  },
+  "mac":  { name:"Mac \u2014 staff station + real wheel", tag:"MAC",  half:1, x:"XM" },
+  "ipad": { name:"iPad \u2014 customer wheel",           tag:"IPAD", half:2, x:"XI" }
 };
 
 /* The printed codes THIS device may hand out for a prize. 0001-0030 splits into
@@ -969,7 +972,7 @@ function stockLeft(prize){
 }
 
 /* Returns the next unused PRINTED code for this prize, or null when that pile is
-   empty (staff then write a backup slip and the app issues an X-series code). */
+   empty (the app then issues an X-series code). */
 function nextVoucher(prize){
   var b = blockFor(prize);
   if (!b) return null;
@@ -1266,9 +1269,6 @@ function award(prize, slot, source){
   $("vCode").textContent = rec.voucher;
   drawVoucherQR(rec);
 
-  if (isOverflow){
-    toast("PRINTED $" + prize.amt + " VOUCHERS ARE GONE \u2014 write a backup slip, code " + code, 9000);
-  }
   $("ovVoucher").classList.add("on");
   $("rimGlow").style.opacity = "1";
   fanfare(jack); confetti(jack);
@@ -1520,13 +1520,15 @@ function renderAdmin(){
   });
   $("distTbl").innerHTML = rows.join("");
   var st = DB.getStation();
-  $("stockHead").textContent = st ? "Printed voucher stock \u2014 this device's piles (" + STATIONS[st].tag + ")" : "Printed voucher stock";
-  var srows = ['<tr><th>Prize</th><th>Printed</th><th>Handed out</th><th>Left in the pile</th><th>Code block</th></tr>'];
+  /* Vouchers are digital only now (Adam, 2026-10-16: no more printed vouchers), so this
+     is just a count; the code blocks only keep the two devices' codes from clashing. */
+  $("stockHead").textContent = "Vouchers given out on this device" + (st ? " (" + STATIONS[st].tag + ")" : "");
+  var srows = ['<tr><th>Prize</th><th>Given out</th><th>Codes</th></tr>'];
   [25,50,75,100,200].forEach(function(a){
-    var b = blockFor(a), total = b.to - b.from + 1, left = stockLeft(a);
-    srows.push('<tr><td><b>$' + a + ' off</b></td><td>' + total + '</td><td>' + (total-left) +
-      '</td><td' + (left === 0 ? ' style="color:#FF7A6E;font-weight:900"' : (left <= 3 ? ' style="color:#FFD52A;font-weight:900"' : '')) +
-      '>' + left + '</td><td style="font-family:monospace">' + CFG.codePrefix + pad4(b.from) + ' - ' + CFG.codePrefix + pad4(b.to) + '</td></tr>');
+    var n = 0, b = blockFor(a);
+    for (var ri=0; ri<records.length; ri++) if (records[ri].prize === a) n++;
+    srows.push('<tr><td><b>$' + a + ' off</b></td><td>' + n + '</td><td style="font-family:monospace">' +
+      CFG.codePrefix + pad4(b.from) + ' &hellip; then ' + CFG.codePrefix + STATIONS[st].x + '0001 &hellip;</td></tr>');
   });
   $("stockTbl").innerHTML = srows.join("");
 
