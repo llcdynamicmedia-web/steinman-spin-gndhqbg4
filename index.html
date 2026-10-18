@@ -196,9 +196,9 @@ table.data tr:nth-child(even) td{background:#181818}
 /* The centre of the wheel is a spin button (Adam, 2026-10-16); it breathes while it is ready. */
 .vwon{font-size:clamp(24px,3.6vw,40px);letter-spacing:.5px}
 .vwon em{font-style:normal;color:var(--yellow)}
-.jtag{display:none;font-size:14px;font-weight:900;letter-spacing:6px;color:var(--gold);margin-bottom:2px}
+.jtag{font-size:clamp(15px,1.7vw,20px);font-weight:900;letter-spacing:6px;color:var(--yellow);margin-bottom:4px}
 #voucherCard.jackpot{border-color:var(--gold);box-shadow:0 0 0 7px rgba(232,162,0,.2),0 0 90px rgba(232,162,0,.4)}
-#voucherCard.jackpot .jtag{display:block;animation:pulse 1s ease-in-out infinite}
+#voucherCard.jackpot .jtag{color:var(--gold);animation:pulse 1s ease-in-out infinite}
 #voucherCard.jackpot .vwon em{color:var(--gold)}
 #hubBtn{cursor:pointer;transform-box:fill-box;transform-origin:center;-webkit-tap-highlight-color:transparent}
 #hubBtn.ready{animation:hubPulse 1.6s ease-in-out infinite}
@@ -328,7 +328,7 @@ table.data tr:nth-child(even) td{background:#181818}
 <!-- VOUCHER: shown straight after the spin (Adam, 2026-10-16: merged the old "You won" card in) -->
 <div class="overlay" id="ovVoucher">
   <div class="card" id="voucherCard">
-    <div class="jtag noprint">&#9733; JACKPOT &#9733;</div>
+    <div class="jtag noprint" id="vCheer">NICE SPIN</div>
     <h2 class="noprint vwon" id="vWon">YOU WON <em>$75 OFF</em></h2>
     <p class="leadtext noprint" style="margin-top:4px">Scan the QR code to save this voucher to your phone.</p>
     <div class="voucher" id="voucherEl">
@@ -1255,12 +1255,17 @@ function issueVoucher(prize, slot, source){
   return rec;
 }
 
+/* A line above "YOU WON" that grows with the prize, so a $25 still feels like a win
+   (Adam, 2026-10-17: rather than a "better luck next time" slot -- every spin wins). */
+var CHEER = { 25: "NICE SPIN", 50: "GREAT SPIN", 75: "BIG WIN", 100: "HUGE WIN", 200: "&#9733; JACKPOT &#9733;" };
+
 function award(prize, slot, source){
   var jack = prize.amt === 200;
   var rec = issueVoucher(prize, slot, source), code = rec.voucher, isOverflow = rec.overflow;
   pending = rec;
 
   /* Straight to the voucher -- one screen, not "You won" then "Continue" (Adam, 2026-10-16). */
+  $("vCheer").innerHTML = CHEER[prize.amt] || "NICE SPIN";
   $("vWon").innerHTML = "YOU WON <em>$" + prize.amt + " OFF</em>";
   $("voucherCard").classList.toggle("jackpot", jack);
   $("voucherCard").classList.remove("pop"); void $("voucherCard").offsetWidth; $("voucherCard").classList.add("pop");
