@@ -811,15 +811,16 @@ var CFG = {
 /* Physical wheel layout. The prize that gets awarded is chosen by picking one of
    these TEN slots uniformly at random, so the odds ARE the layout — there is no
    second, hidden probability table anywhere in this file.
-   $25 x3 (30%) | $50 x3 (30%) | $75 x2 (20%) | $100 x1 (10%) | $200 x1 (10%)  */
+   $25 x3 (30%) | $50 x3 (30%) | $75 x2 (20%) | $100 x1 (10%) | $200 x1 (10%)
+   $25's minimum went from $100 to $150 (Adam, 2026-10-17) so it caps at 16.7% like the rest. */
 var SEGMENTS = [
-  { amt:25,  min:100  },
+  { amt:25,  min:150  },
   { amt:50,  min:300  },
   { amt:75,  min:500  },
-  { amt:25,  min:100  },
+  { amt:25,  min:150  },
   { amt:50,  min:300  },
   { amt:200, min:1500 },
-  { amt:25,  min:100  },
+  { amt:25,  min:150  },
   { amt:75,  min:500  },
   { amt:100, min:750  },
   { amt:50,  min:300  }
