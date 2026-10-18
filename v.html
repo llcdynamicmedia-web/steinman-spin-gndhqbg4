@@ -40,13 +40,13 @@ h1 em{ font-style:normal; color:var(--yellow) }
 <body>
 <div class="wrap">
   <h1>YOUR <em>VOUCHER</em></h1>
-  <p class="lead" id="lead">Save it to your phone so you have it when you book.</p>
+  <p class="lead" id="lead">Save this voucher to your phone and show it when you book.</p>
   <div id="ok" class="hide">
     <img id="vimg" alt="Your Steinman voucher">
     <button class="btn save" id="saveBtn">SAVE TO MY PHONE</button>
     <p class="hint">Or press and hold the voucher, then tap <b>Save to Photos</b>.</p>
-    <a class="btn text" id="textBtn">TEXT IT TO STEINMAN</a>
-    <p class="hint">Sends us your code so we can hold it for you.</p>
+    <a class="btn text" id="textBtn">TEXT US YOUR VOUCHER</a>
+    <p class="hint">We’ll keep it on file for you.</p>
     <a class="btn call" id="callBtn">CALL TO BOOK</a>
   </div>
   <div id="bad" class="err hide"></div>
@@ -84,12 +84,11 @@ function money(n){ return "$" + Number(n).toLocaleString("en-US"); }
 
 <script>
 "use strict";
-var TERMS = "One free spin per customer. One voucher per customer. Not stackable with today’s purchases. " +
-  "One discount per transaction. Good on any vehicle repair or installation. Minimum purchase is calculated " +
-  "before tax and before the discount is applied. Not redeemable for cash and no cash value. Cannot be combined " +
-  "with any other promotion — where more than one offer applies, you receive whichever single discount is " +
-  "greater. Service must be booked on or before " + VCFG.deadlineTxt + ". A $50 deposit secures your appointment " +
-  "and is applied toward your final balance. Steinman Auto & Audio reserves the right to verify vouchers.";
+var TERMS = "One spin and one voucher per customer. Valid on any vehicle repair or installation that meets the minimum " +
+  "purchase, calculated before tax and before the discount. One discount per transaction. Not valid toward purchases made " +
+  "at the event, and not combinable with other promotions \u2014 where more than one offer applies, the greater single " +
+  "discount is honored. No cash value. Service must be booked by " + VCFG.deadlineTxt + ". A $50 deposit reserves your " +
+  "appointment and is applied to your final balance. Steinman Auto & Audio reserves the right to verify all vouchers.";
 
 var W = 1080, H = 1350;
 var BIG  = "'Arial Black','Helvetica Neue',Arial,sans-serif";
@@ -172,7 +171,7 @@ function drawVoucher(v, auto, audio){
   g.fillText("OFF", x, y + 70);
 
   /* minimum, in a yellow band */
-  var minTxt = "ON ANY REPAIR OR INSTALL OF " + money(v.min) + " OR MORE";
+  var minTxt = "ANY REPAIR OR INSTALLATION OF " + money(v.min) + " OR MORE";
   var fs = fit(g, minTxt, "900", 36, 22, BIG, inner - 40);
   g.fillStyle = "#FFD52A"; g.fillRect(x, y + 110, inner, fs + 34);
   g.fillStyle = "#111111"; g.fillText(minTxt, x + 20, y + 110 + fs + 10);
@@ -229,7 +228,7 @@ function show(v){
     /* iPhone wants sms:NUMBER&body=, Android wants sms:NUMBER?body= */
     var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
               (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    var body = "My Steinman voucher " + v.code + ": $" + v.prize + " off any repair or install of " +
+    var body = "My Steinman voucher " + v.code + ": $" + v.prize + " off any repair or installation of " +
                money(v.min) + " or more. Book by " + VCFG.deadlineTxt + ".";
     $("textBtn").href = "sms:+1" + VCFG.textTo + (ios ? "&" : "?") + "body=" + encodeURIComponent(body);
     $("callBtn").href = "tel:+1" + VCFG.phone.replace(/\D/g, "");
@@ -241,8 +240,8 @@ var v = parseVoucher(location.hash);
 if (v) show(v);
 else {
   $("lead").classList.add("hide");
-  $("bad").innerHTML = "This voucher link doesn’t look complete. Call us at <b>" + VCFG.phone +
-                       "</b> with your voucher code and we’ll look it up.";
+  $("bad").innerHTML = "This voucher link is incomplete. Please call <b>" + VCFG.phone +
+                       "</b> with your voucher code and we\u2019ll look it up.";
   $("bad").classList.remove("hide");
 }
 </script>
