@@ -361,7 +361,6 @@ table.data tr:nth-child(even) td{background:#181818}
     <div class="btnrow noprint">
       <button class="btn" id="bookBtn">BOOK AN APPOINTMENT</button>
       <button class="btn dark" id="leadBtn">SAVE MY VOUCHER</button>
-      <button class="btn ghost sm" id="printVBtn">PRINT</button>
     </div>
   </div>
 </div>
@@ -1304,7 +1303,6 @@ function pickRealPrize(amt){
 }
 function applyStation(){
   $("realBtn").classList.toggle("hide", DB.getStation() !== "mac");
-  $("printVBtn").classList.toggle("hide", DB.getStation() === "ipad");   // no printer at the iPad
   paintStoreBadge();
 }
 
@@ -1689,7 +1687,6 @@ function go(){
   });
   $("bookBtn").addEventListener("click", function(){ openForm("book"); });
   $("leadBtn").addEventListener("click", function(){ openForm("lead"); });
-  $("printVBtn").addEventListener("click", function(){ window.print(); });
   $("saveBtn").addEventListener("click", saveForm);
   /* Skipping the form: if they typed an email anyway, send it; otherwise ask once. */
   function emailOnly(email){
